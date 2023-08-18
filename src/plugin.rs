@@ -16,17 +16,21 @@ use {
     crate::{
         sanitized_message, CompiledInstruction, Config, Filter, InnerInstruction,
         InnerInstructions, LegacyLoadedMessage, LegacyMessage, LoadedAddresses,
-        MessageAddressTableLookup, MessageHeader, PrometheusService, Publisher, Reward,
-        SanitizedMessage, SanitizedTransaction, SlotStatus, SlotStatusEvent, TransactionEvent,
+        MessageAddressTableLookup, MessageHeader, PrometheusService, Publisher,
+        SanitizedMessage, SanitizedTransaction, TransactionEvent, Reward,
         TransactionStatusMeta, TransactionTokenBalance, UiTokenAmount, UpdateAccountEvent,
         V0LoadedMessage, V0Message,
+        common::{ SlotInfo, SlotStatus, ReplicaBlockInfoV2 },
     },
     log::{debug, error, info, log_enabled},
     rdkafka::util::get_rdkafka_version,
+    rdkafka::types::RDKafkaErrorCode,
+    rdkafka::error::KafkaError,
     solana_geyser_plugin_interface::geyser_plugin_interface::{
-        GeyserPlugin, GeyserPluginError as PluginError, ReplicaAccountInfoV3,
+        GeyserPlugin, GeyserPluginError, ReplicaAccountInfoV3,
         ReplicaAccountInfoVersions, ReplicaTransactionInfoV2, ReplicaTransactionInfoVersions,
-        Result as PluginResult, SlotStatus as PluginSlotStatus,
+        ReplicaBlockInfoVersions, ReplicaEntryInfoVersions,
+        Result as PluginResult
     },
     solana_program::pubkey::Pubkey,
     std::fmt::{Debug, Formatter},
@@ -53,7 +57,7 @@ impl GeyserPlugin for KafkaPlugin {
 
     fn on_load(&mut self, config_file: &str) -> PluginResult<()> {
         if self.publisher.is_some() {
-            return Err(PluginError::Custom("plugin already loaded".into()));
+            return Err(GeyserPluginError::Custom("plugin already loaded".into()));
         }
 
         solana_logger::setup_with_default("info");
@@ -70,14 +74,14 @@ impl GeyserPlugin for KafkaPlugin {
 
         let producer = config.producer().map_err(|error| {
             error!("Failed to create kafka producer: {error:?}");
-            PluginError::Custom(Box::new(error))
+            GeyserPluginError::Custom(Box::new(error))
         })?;
         info!("Created rdkafka::FutureProducer");
 
         let publisher = Publisher::new(producer, &config);
         let prometheus = config
             .create_prometheus()
-            .map_err(|error| PluginError::Custom(Box::new(error)))?;
+            .map_err(|error| GeyserPluginError::Custom(Box::new(error)))?;
         self.publisher = Some(publisher);
         self.filter = Some(Filter::new(&config));
         self.prometheus = prometheus;
@@ -99,7 +103,8 @@ impl GeyserPlugin for KafkaPlugin {
         account: ReplicaAccountInfoVersions,
         slot: u64,
         is_startup: bool,
-    ) -> PluginResult<()> {
+    ) -> PluginResult<()>
+    {
         if is_startup && !self.publish_all_accounts {
             return Ok(());
         }
@@ -126,36 +131,47 @@ impl GeyserPlugin for KafkaPlugin {
         let publisher = self.unwrap_publisher();
         publisher
             .update_account(event)
-            .map_err(|e| PluginError::AccountsUpdateError { msg: e.to_string() })
+            .map_err(|e| GeyserPluginError::AccountsUpdateError { msg: e.to_string() })
+    }
+
+    fn notify_end_of_startup(&self) -> PluginResult<()> {
+        info!("Called when all accounts are notified of during startup");
+        todo!()
     }
 
     fn update_slot_status(
         &self,
         slot: u64,
         parent: Option<u64>,
-        status: PluginSlotStatus,
-    ) -> PluginResult<()> {
+        status: solana_geyser_plugin_interface::geyser_plugin_interface::SlotStatus,
+    ) -> PluginResult<()>
+    {
         let publisher = self.unwrap_publisher();
         if !publisher.wants_slot_status() {
             return Ok(());
         }
 
-        let event = SlotStatusEvent {
+        let event = SlotInfo {
             slot,
-            parent: parent.unwrap_or(0),
-            status: SlotStatus::from(status).into(),
+            parent,
+            status: match status {
+                solana_geyser_plugin_interface::geyser_plugin_interface::SlotStatus::Confirmed => SlotStatus::Confirmed,
+                solana_geyser_plugin_interface::geyser_plugin_interface::SlotStatus::Processed => SlotStatus::Processed,
+                solana_geyser_plugin_interface::geyser_plugin_interface::SlotStatus::Rooted => SlotStatus::Rooted,
+            },
         };
 
         publisher
-            .update_slot_status(event)
-            .map_err(|e| PluginError::SlotStatusUpdateError { msg: e.to_string() })
+        .update_slot_status(event)
+        .map_err(|e| GeyserPluginError::SlotStatusUpdateError { msg: e.to_string() })
     }
 
     fn notify_transaction(
         &self,
         transaction: ReplicaTransactionInfoVersions,
         slot: u64,
-    ) -> PluginResult<()> {
+    ) -> PluginResult<()>
+    {
         let publisher = self.unwrap_publisher();
         if !publisher.wants_transaction() {
             return Ok(());
@@ -184,15 +200,66 @@ impl GeyserPlugin for KafkaPlugin {
 
         publisher
             .update_transaction(event)
-            .map_err(|e| PluginError::TransactionUpdateError { msg: e.to_string() })
+            .map_err(|e| GeyserPluginError::TransactionUpdateError { msg: e.to_string() })
     }
 
+    // fn notify_entry(&self, entry: ReplicaEntryInfoVersions) -> PluginResult<()> {
+    //     todo!()
+    // }
+
+    fn notify_block_metadata(&self, blockinfo: ReplicaBlockInfoVersions) -> PluginResult<()> {
+        solana_logger::setup_with_default("info");
+        match blockinfo {
+            ReplicaBlockInfoVersions::V0_0_1(_info) => {
+                panic!("ReplicaBlockInfoVersion::V0_0_1 unsupported, please upgrade your Solana node.");
+                // TODO: clarify panic usage
+            }
+            ReplicaBlockInfoVersions::V0_0_2(_info) => {
+                info!("ReplicaBlockInfoVersion::V0_0_2");
+                info!("notify_block_metadata: {:?}", _info);
+                let publisher = self.unwrap_publisher();
+                if !publisher.wants_slot_status() {
+                    return Ok(());
+                }
+
+                let block_info = ReplicaBlockInfoV2 {
+                    parent_slot: _info.parent_slot,
+                    parent_blockhash: _info.parent_blockhash,
+                    slot: _info.slot,
+                    blockhash: _info.blockhash,
+                    // rewards: _info.rewards,
+                    block_time: _info.block_time,
+                    block_height: _info.block_height,
+                    executed_transaction_count: _info.executed_transaction_count,
+                };
+
+                let result = publisher.update_block_metadata(&block_info);
+                match result {
+                    Ok(_) => {
+                        info!("update_block_metadata success");
+                        Ok(())
+                    }
+                    Err(e) => {
+                        info!("update_block_metadata failed");
+                        Err(GeyserPluginError::SlotStatusUpdateError {
+                            msg: format!("update_block_metadata failed: slot: {:?}, error: {:?}", _info.slot, e.to_string()),
+                        })
+                    }
+                }
+            }
+        }
+    }
+    
     fn account_data_notifications_enabled(&self) -> bool {
         self.unwrap_publisher().wants_update_account()
     }
 
     fn transaction_notifications_enabled(&self) -> bool {
         self.unwrap_publisher().wants_transaction()
+    }
+
+    fn entry_notifications_enabled(&self) -> bool {
+        self.unwrap_publisher().wants_entry_notification()
     }
 }
 

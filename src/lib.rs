@@ -21,6 +21,7 @@ mod plugin;
 mod prom;
 mod publisher;
 mod version;
+mod common;
 
 pub use {
     config::{Config, Producer},

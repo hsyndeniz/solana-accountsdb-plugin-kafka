@@ -44,6 +44,12 @@ pub struct Config {
     /// Kafka topic to send transaction to.
     #[serde(default)]
     pub transaction_topic: String,
+    // Kafka topic to send entry notification to.
+    #[serde(default)]
+    pub entry_notification_topic: String,
+    // Kafka topic to send block metadata to.
+    #[serde(default)]
+    pub block_metadata_topic: String,
     /// List of programs to ignore.
     #[serde(default)]
     pub program_ignores: Vec<String>,
@@ -72,6 +78,8 @@ impl Default for Config {
             update_account_topic: "".to_owned(),
             slot_status_topic: "".to_owned(),
             transaction_topic: "".to_owned(),
+            entry_notification_topic: "".to_owned(),
+            block_metadata_topic: "".to_owned(),
             program_ignores: Vec::new(),
             program_filters: Vec::new(),
             account_filters: Vec::new(),
