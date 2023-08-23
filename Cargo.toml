@@ -1,37 +1,70 @@
 [package]
-name = "solana-accountsdb-plugin-kafka"
+name = "solana-indexer"
 description = "Solana AccountsDb plugin for Kafka"
-authors = ["Blockdaemon"]
-version = "0.1.6+solana.1.16.8-rc1"
+authors = ["hsyndeniz"]
+version = "1.0.0"
 edition = "2021"
-repository = "https://github.com/Blockdaemon/solana-accountsdb-plugin-kafka"
+repository = "https://github.com/hsyndeniz/solana-indexer"
 license = "Apache-2.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-solana-geyser-plugin-interface = { version = "~1.16" }
-solana-logger = { version = "~1.16" }
-solana-program = "~1.16"
-solana-transaction-status = { version = "~1.16" }
+solana-sdk = { version = "1.16.9" }
+solana-logger = { version = "1.16.9" }
+solana-measure = { version = "1.16.9" }
+solana-metrics = { version = "1.16.9" }
+solana-runtime = { version = "1.16.9" }
+solana-program = { version = "1.16.9" }
+solana-account-decoder = { version = "1.16.9" }
+solana-transaction-status = { version = "1.16.9" }
+solana-geyser-plugin-interface = { version = "1.16.9" }
 
-hyper = { version = "0.14.26", features = ["server"] }
-lazy_static = "1.4.0"
 log = "*"
-prometheus = "0.13.3"
 prost = "*"
+prometheus = { version = "0.13.3" }
+lazy_static = { version = "1.4.0" }
+serde_json = { version = "1.0.105" }
+serde_derive = { version = "1.0.185" }
+serde = { version = "1.0.185", features = ["derive"] }
+hyper = { version = "0.14.27", features = ["server"] }
 rdkafka = { version = "0.33.2", features = ["ssl", "sasl"] }
-serde = { version = "~1", features = ["derive"] }
-serde_json = { version = "~1" }
-tokio = { version = "1.32", features = ["rt-multi-thread", "time", "macros", "sync"] }
+tokio = { version = "1.32.0", features = ["rt-multi-thread", "time", "macros", "sync"] }
+
+openssl = { version = "0.10.56" }
+thiserror = { version = "1.0.47" }
+tokio-postgres = { version = "0.7.9" }
+postgres-openssl = { version = "0.5.0" }
+postgres-types = { version = "0.2.6", features = ["derive"] }
+postgres = { version = "0.19.6", features = ["with-chrono-0_4", "with-serde_json-1"] }
+
+bs58 = { version = "0.5.0" }
+bytemuck = { version = "1.13.1" }
+crossbeam-channel = { version = "0.5.8" }
+chrono = { version = "0.4.26", features = ["serde"] }
+
+avro-rs = { version = "0.13.0" }
+apache-avro = { version = "0.15.0", features = ["snappy"] }
 
 [build-dependencies]
+prost-build = "*"
 anyhow = "1.0.75"
 cargo-lock = "9.0.0"
 git-version = "0.3.5"
-prost-build = "*"
-vergen = { version = "8.2.1", features = ["build", "rustc"] }
+vergen = { version = "8.2.4", features = ["build", "rustc"] }
+
+[dev-dependencies]
+libc = "0.2.147"
+tempfile = "3.8.0"
+libloading = "0.8.0"
+serial_test = "2.0.0"
+socket2 = { version = "0.5.3", features = ["all"] }
+
+# solana-local-cluster = { version = "1.16.8" }
+# solana-net-utils = { version = "1.16.8" }
+# solana-streamer = { version = "1.16.8" }
+# solana-core = { version = "1.16.8" }
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]

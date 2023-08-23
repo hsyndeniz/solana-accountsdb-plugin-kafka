@@ -1,122 +1,89 @@
-// Copyright 2022 Blockdaemon Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+use crate::prom::StatsThreadedProducerContext;
+use log::info;
 
-use {
-    crate::{prom::StatsThreadedProducerContext, PrometheusService},
-    rdkafka::{
-        config::FromClientConfigAndContext,
-        error::KafkaResult,
-        producer::{DefaultProducerContext, ThreadedProducer},
-        ClientConfig,
-    },
-    serde::Deserialize,
-    solana_geyser_plugin_interface::geyser_plugin_interface::{
-        GeyserPluginError, Result as PluginResult,
-    },
-    std::{collections::HashMap, fs::File, io::Result as IoResult, net::SocketAddr, path::Path},
+use rdkafka::{
+    config::FromClientConfigAndContext, error::KafkaResult, producer::ThreadedProducer,
+    ClientConfig,
 };
+use serde::{Deserialize, Serialize};
+use solana_geyser_plugin_interface::geyser_plugin_interface::{GeyserPluginError, Result};
+use solana_sdk::commitment_config::CommitmentLevel;
+use std::collections::HashMap;
+use std::fs::File;
+use std::net::SocketAddr;
+use std::path::Path;
 
-/// Plugin config.
-#[derive(Deserialize)]
-pub struct Config {
-    /// Kafka config.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct KafkaConfig {
     pub kafka: HashMap<String, String>,
-    /// Graceful shutdown timeout.
-    #[serde(default)]
     pub shutdown_timeout_ms: u64,
-    /// Kafka topic to send account updates to.
-    #[serde(default)]
     pub update_account_topic: String,
-    /// Kafka topic to send slot status updates to.
-    #[serde(default)]
-    pub slot_status_topic: String,
-    /// Kafka topic to send transaction to.
-    #[serde(default)]
     pub transaction_topic: String,
-    /// List of programs to ignore.
-    #[serde(default)]
-    pub program_ignores: Vec<String>,
-    /// List of programs to include
-    #[serde(default)]
-    pub program_filters: Vec<String>,
-    // List of accounts to include
-    #[serde(default)]
-    pub account_filters: Vec<String>,
-    /// Publish all accounts on startup.
-    #[serde(default)]
-    pub publish_all_accounts: bool,
-    /// Wrap all event message in a single message type.
-    #[serde(default)]
-    pub wrap_messages: bool,
-    /// Prometheus endpoint.
-    #[serde(default)]
-    pub prometheus: Option<SocketAddr>,
+    pub slot_status_topic: String,
+    pub block_metadata_topic: String,
+    pub entry_notification_topic: String,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            kafka: HashMap::new(),
-            shutdown_timeout_ms: 30_000,
-            update_account_topic: "".to_owned(),
-            slot_status_topic: "".to_owned(),
-            transaction_topic: "".to_owned(),
-            program_ignores: Vec::new(),
-            program_filters: Vec::new(),
-            account_filters: Vec::new(),
-            publish_all_accounts: false,
-            wrap_messages: false,
-            prometheus: None,
-        }
-    }
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Config {
+    pub kafka_config: KafkaConfig,
+    pub prometheus: Option<SocketAddr>,
+    pub account_data_notifications_enabled: bool,
+    pub transaction_notifications_enabled: bool,
+    pub slot_notifications_enabled: bool,
+    pub block_notifications_enabled: bool,
+    pub entry_notifications_enabled: bool,
+    pub commitment_level: CommitmentLevel,
+    pub filters: Filters,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Filters {
+    pub accounts: AccountsFilter,
+    pub transactions: Option<TransactionsFilter>,
+    pub programs: Option<ProgramsFilter>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AccountsFilter {
+    pub include: Vec<String>,
+    pub exclude: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ProgramsFilter {
+    pub include: Vec<String>,
+    pub exclude: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TransactionsFilter {
+    pub mentions: Vec<String>,
 }
 
 impl Config {
-    /// Read plugin from JSON file.
-    pub fn read_from<P: AsRef<Path>>(config_path: P) -> PluginResult<Self> {
-        let file = File::open(config_path)?;
-        let mut this: Self = serde_json::from_reader(file)
-            .map_err(|e| GeyserPluginError::ConfigFileReadError { msg: e.to_string() })?;
-        this.fill_defaults();
-        Ok(this)
+    pub fn read_config<P: AsRef<Path>>(config_path: P) -> Result<Self> {
+        solana_logger::setup_with_default("solana=info");
+        info!("Reading config file");
+        let mut file = File::open(config_path).map_err(|err| {
+            info!("Error opening config file: {}", err);
+            GeyserPluginError::ConfigFileOpenError(err)
+        })?;
+        info!("Parsing config file: {:?}", file);
+        let config: Config = serde_json::from_reader(&mut file).map_err(|err| {
+            info!("Error reading config file: {}", err);
+            GeyserPluginError::ConfigFileReadError {
+                msg: err.to_string(),
+            }
+        })?;
+        Ok(config)
     }
 
-    /// Create rdkafka::FutureProducer from config.
     pub fn producer(&self) -> KafkaResult<ThreadedProducer<StatsThreadedProducerContext>> {
         let mut config = ClientConfig::new();
-        for (k, v) in self.kafka.iter() {
+        for (k, v) in self.kafka_config.kafka.iter() {
             config.set(k, v);
         }
         ThreadedProducer::from_config_and_context(&config, StatsThreadedProducerContext::default())
     }
-
-    fn set_default(&mut self, k: &'static str, v: &'static str) {
-        if !self.kafka.contains_key(k) {
-            self.kafka.insert(k.to_owned(), v.to_owned());
-        }
-    }
-
-    fn fill_defaults(&mut self) {
-        self.set_default("request.required.acks", "1");
-        self.set_default("message.timeout.ms", "30000");
-        self.set_default("compression.type", "lz4");
-        self.set_default("partitioner", "murmur2_random");
-    }
-
-    pub fn create_prometheus(&self) -> IoResult<Option<PrometheusService>> {
-        self.prometheus.map(PrometheusService::new).transpose()
-    }
 }
-
-pub type Producer = ThreadedProducer<DefaultProducerContext>;

@@ -124,6 +124,7 @@ pub struct StatsThreadedProducerContext;
 impl ClientContext for StatsThreadedProducerContext {
     fn stats(&self, statistics: Statistics) {
         for (name, broker) in statistics.brokers {
+            info!("name: {}", name);
             macro_rules! set_value {
                 ($name:expr, $value:expr) => {
                     KAFKA_STATS

@@ -16,17 +16,18 @@ use solana_geyser_plugin_interface::geyser_plugin_interface::GeyserPlugin;
 
 mod config;
 mod event;
-mod filter;
+// mod filter;
+mod common;
 mod plugin;
 mod prom;
 mod publisher;
 mod version;
 
 pub use {
-    config::{Config, Producer},
+    config::Config,
     event::*,
-    filter::Filter,
-    plugin::KafkaPlugin,
+    // filter::Filter,
+    plugin::IndexerPlugin,
     prom::PrometheusService,
     publisher::Publisher,
 };
@@ -40,7 +41,7 @@ pub use {
 /// The Solana validator and this plugin must be compiled with the same Rust compiler version and Solana core version.
 /// Loading this plugin with mismatching versions is undefined behavior and will likely cause memory corruption.
 pub unsafe extern "C" fn _create_plugin() -> *mut dyn GeyserPlugin {
-    let plugin = KafkaPlugin::new();
+    let plugin = IndexerPlugin::new();
     let plugin: Box<dyn GeyserPlugin> = Box::new(plugin);
     Box::into_raw(plugin)
 }

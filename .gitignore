@@ -2,3 +2,5 @@
 .idea/
 *.json
 !example-config.json
+
+/test-ledger

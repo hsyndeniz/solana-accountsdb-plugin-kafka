@@ -1,0 +1,47 @@
+{
+  "libpath": "/Users/huseyin/Desktop/indexer/solana-accountsdb-plugin-kafka/target/debug/libsolana_accountsdb_plugin_kafka.dylib",
+  "kafka_config": {
+    "kafka": {
+      "bootstrap.servers": "localhost:9092",
+      "request.required.acks": "1",
+      "message.timeout.ms": "30000",
+      "compression.type": "none",
+      "partitioner": "murmur2_random"
+    },
+    "shutdown_timeout_ms": 30000,
+    "update_account_topic": "solana.testnet.account_updates",
+    "slot_status_topic": "solana.testnet.slot_status",
+    "transaction_topic": "solana.testnet.transactions",
+    "block_metadata_topic": "solana.testnet.block_metadata",
+    "entry_notification_topic": "solana.testnet.entry_notification",
+    "publish_all_accounts": true,
+    "wrap_messages": false,
+    "program_ignores": [
+      "Sysvar1111111111111111111111111111111111111",
+      "Vote111111111111111111111111111111111111111"
+    ]
+  },
+  "postgres_config": {
+    "host": "localhost",
+    "user": "root",
+    "port": 5433,
+    "connection_str": "host=localhost user=root password=secret dbname=api port=5432",
+    "threads": 20,
+    "batch_size": 20,
+    "panic_on_db_errors": true,
+    "store_account_historical_data": true,
+    "index_token_owner": true,
+    "index_token_mint": true,
+    "skip_upsert_existing_accounts_at_startup": false
+  },
+  "commitment_level": "Finalized",
+  "account_data_notifications_enabled": false,
+  "transaction_notifications_enabled": true,
+  "entry_notifications_enabled": true,
+  "accounts_selector": {
+    "accounts" : ["*"]
+  },
+  "transaction_selector": {
+    "mentions" : ["*"]
+  }
+}

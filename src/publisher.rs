@@ -14,16 +14,19 @@
 
 use {
     crate::{
-        message_wrapper::EventMessage::{self, Account, Slot, Transaction},
+        common::serialize_struct,
+        common::block::{BlockInfoV2, SlotInfo},
+        message_wrapper::EventMessage::{self, Account, Transaction},
         prom::{
             StatsThreadedProducerContext, UPLOAD_ACCOUNTS_TOTAL, UPLOAD_SLOTS_TOTAL,
             UPLOAD_TRANSACTIONS_TOTAL,
         },
-        Config, MessageWrapper, SlotStatusEvent, TransactionEvent, UpdateAccountEvent,
+        Config, MessageWrapper, TransactionEvent, UpdateAccountEvent,
     },
+    log::info,
     prost::Message,
     rdkafka::{
-        error::KafkaError,
+        error::{KafkaError, RDKafkaErrorCode},
         producer::{BaseRecord, Producer, ThreadedProducer},
     },
     std::time::Duration,
@@ -36,30 +39,25 @@ pub struct Publisher {
     update_account_topic: String,
     slot_status_topic: String,
     transaction_topic: String,
-
-    wrap_messages: bool,
+    entry_notification_topic: String,
+    block_metadata_topic: String,
 }
 
 impl Publisher {
     pub fn new(producer: ThreadedProducer<StatsThreadedProducerContext>, config: &Config) -> Self {
         Self {
             producer,
-            shutdown_timeout: Duration::from_millis(config.shutdown_timeout_ms),
-            update_account_topic: config.update_account_topic.clone(),
-            slot_status_topic: config.slot_status_topic.clone(),
-            transaction_topic: config.transaction_topic.clone(),
-            wrap_messages: config.wrap_messages,
+            shutdown_timeout: Duration::from_millis(config.kafka_config.shutdown_timeout_ms),
+            update_account_topic: config.kafka_config.update_account_topic.clone(),
+            slot_status_topic: config.kafka_config.slot_status_topic.clone(),
+            transaction_topic: config.kafka_config.transaction_topic.clone(),
+            entry_notification_topic: config.kafka_config.entry_notification_topic.clone(),
+            block_metadata_topic: config.kafka_config.block_metadata_topic.clone(),
         }
     }
 
     pub fn update_account(&self, ev: UpdateAccountEvent) -> Result<(), KafkaError> {
-        let temp_key;
-        let (key, buf) = if self.wrap_messages {
-            temp_key = self.copy_and_prepend(ev.pubkey.as_slice(), 65u8);
-            (&temp_key, Self::encode_with_wrapper(Account(Box::new(ev))))
-        } else {
-            (&ev.pubkey, ev.encode_to_vec())
-        };
+        let (key, buf) = (&ev.pubkey, ev.encode_to_vec());
         let record = BaseRecord::<Vec<u8>, _>::to(&self.update_account_topic)
             .key(key)
             .payload(&buf);
@@ -70,36 +68,35 @@ impl Publisher {
         result
     }
 
-    pub fn update_slot_status(&self, ev: SlotStatusEvent) -> Result<(), KafkaError> {
-        let temp_key;
-        let (key, buf) = if self.wrap_messages {
-            temp_key = self.copy_and_prepend(&ev.slot.to_le_bytes(), 83u8);
-            (&temp_key, Self::encode_with_wrapper(Slot(Box::new(ev))))
-        } else {
-            temp_key = ev.slot.to_le_bytes().to_vec();
-            (&temp_key, ev.encode_to_vec())
-        };
-        let record = BaseRecord::<Vec<u8>, _>::to(&self.slot_status_topic)
-            .key(key)
-            .payload(&buf);
-        let result = self.producer.send(record).map(|_| ()).map_err(|(e, _)| e);
-        UPLOAD_SLOTS_TOTAL
-            .with_label_values(&[if result.is_ok() { "success" } else { "failed" }])
-            .inc();
-        result
+    pub fn update_slot_status(&self, event: SlotInfo) -> Result<(), KafkaError> {
+        solana_logger::setup_with_default("info");
+
+        let _key = event.slot.to_string();
+        // let value = serialize_slot_info(&event).unwrap();
+        //
+        // let record = BaseRecord::<String, _>::to(&self.slot_status_topic)
+        //     .key(&key)
+        //     .payload(&value);
+        //
+        // match self.producer.send(record) {
+        //     Ok(_) => {
+        //         UPLOAD_SLOTS_TOTAL.with_label_values(&["success"]).inc();
+        //         Ok(())
+        //     }
+        //     Err((e, _)) => {
+        //         info!(
+        //             "Failed to send slot status for slot {}: {:?}",
+        //             event.slot, e
+        //         );
+        //         UPLOAD_SLOTS_TOTAL.with_label_values(&["failed"]).inc();
+        //         Err(KafkaError::MessageProduction(RDKafkaErrorCode::Fail))
+        //     }
+        // }
+        Ok(())
     }
 
     pub fn update_transaction(&self, ev: TransactionEvent) -> Result<(), KafkaError> {
-        let temp_key;
-        let (key, buf) = if self.wrap_messages {
-            temp_key = self.copy_and_prepend(ev.signature.as_slice(), 84u8);
-            (
-                &temp_key,
-                Self::encode_with_wrapper(Transaction(Box::new(ev))),
-            )
-        } else {
-            (&ev.signature, ev.encode_to_vec())
-        };
+        let (key, buf) = (&ev.signature, ev.encode_to_vec());
         let record = BaseRecord::<Vec<u8>, _>::to(&self.transaction_topic)
             .key(key)
             .payload(&buf);
@@ -108,6 +105,39 @@ impl Publisher {
             .with_label_values(&[if result.is_ok() { "success" } else { "failed" }])
             .inc();
         result
+    }
+
+    pub fn update_entry(&self, _event: String) -> Result<(), KafkaError> {
+        info!("update_entry");
+        return Ok(());
+    }
+
+    pub fn update_block_metadata(&self, event: &BlockInfoV2) -> Result<(), KafkaError> {
+        solana_logger::setup_with_default("info");
+        info!(
+            "update_block_metadata, topic: {}",
+            self.block_metadata_topic
+        );
+        let key = event.slot.to_string();
+        let value = serialize_struct(&event).unwrap();
+
+        let record = BaseRecord::<String, _>::to(&self.block_metadata_topic)
+            .key(&key)
+            .payload(&value);
+
+        match self.producer.send(record) {
+            Ok(_) => {
+                info!("block metadata sent to kafka");
+                Ok(())
+            }
+            Err((e, _)) => {
+                info!(
+                    "Failed to send block metadata for slot {}: {:?}",
+                    event.slot, e
+                );
+                Err(KafkaError::MessageProduction(RDKafkaErrorCode::Fail))
+            }
+        }
     }
 
     pub fn wants_update_account(&self) -> bool {
@@ -120,6 +150,14 @@ impl Publisher {
 
     pub fn wants_transaction(&self) -> bool {
         !self.transaction_topic.is_empty()
+    }
+
+    pub fn wants_entry_notification(&self) -> bool {
+        !self.entry_notification_topic.is_empty()
+    }
+
+    pub fn wants_block_metadata(&self) -> bool {
+        !self.block_metadata_topic.is_empty()
     }
 
     fn encode_with_wrapper(message: EventMessage) -> Vec<u8> {
