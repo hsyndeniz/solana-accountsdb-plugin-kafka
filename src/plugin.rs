@@ -1,19 +1,19 @@
 use {
     crate::{
-        common::transaction::TransactionInfoV2,
-        common::block::{parse_block_metadata, parse_slot_status},
         common::account::AccountInfoV3,
+        common::block::{parse_block_metadata, parse_slot_status},
+        common::transaction::TransactionInfoV2,
         config::Config,
     },
-    solana_geyser_plugin_interface::geyser_plugin_interface::{
-        GeyserPlugin, GeyserPluginError, Result, SlotStatus, ReplicaBlockInfoVersions,
-        ReplicaEntryInfoVersions, ReplicaTransactionInfoVersions, ReplicaAccountInfoVersions,
-    },
-    std::fmt::Debug,
     log::{error, info},
     rdkafka::producer::Producer,
+    solana_geyser_plugin_interface::geyser_plugin_interface::{
+        GeyserPlugin, GeyserPluginError, ReplicaAccountInfoVersions, ReplicaBlockInfoVersions,
+        ReplicaEntryInfoVersions, ReplicaTransactionInfoVersions, Result, SlotStatus,
+    },
     solana_program::clock::Slot,
     solana_sdk::commitment_config::CommitmentLevel,
+    std::fmt::Debug,
 };
 
 #[derive(Default)]
@@ -87,7 +87,12 @@ impl GeyserPlugin for IndexerPlugin {
         todo!("Shutdown any threads, services, etc. here");
     }
 
-    fn update_account(&self, account: ReplicaAccountInfoVersions, slot: Slot, is_startup: bool) -> Result<()> {
+    fn update_account(
+        &self,
+        account: ReplicaAccountInfoVersions,
+        slot: Slot,
+        is_startup: bool,
+    ) -> Result<()> {
         match account {
             ReplicaAccountInfoVersions::V0_0_1(_info) => {
                 panic!("ReplicaAccountInfoVersion::V0_0_1 unsupported, please upgrade your Solana node.");
@@ -99,7 +104,7 @@ impl GeyserPlugin for IndexerPlugin {
             }
             ReplicaAccountInfoVersions::V0_0_3(_info) => {
                 let account_info = AccountInfoV3::from(_info, slot, is_startup);
-                info!("account_info: {:?}", account_info);
+                info!("account_info: slot: {:?}, pubkey: {:?}, is_startup: {:?}, lamports: {:?}, owner: {:?}, executable: {:?}, rent_epoch: {:?}, write_version: {:?}, txn: {:?}", account_info.slot, account_info.pubkey, account_info.is_startup, account_info.lamports, account_info.owner, account_info.executable, account_info.rent_epoch, account_info.write_version, account_info.txn);
                 // ? Send account info to kafka and/or postgres
                 Ok(())
             }
@@ -133,7 +138,11 @@ impl GeyserPlugin for IndexerPlugin {
         Ok(())
     }
 
-    fn notify_transaction(&self, transaction: ReplicaTransactionInfoVersions, slot: Slot) -> Result<()> {
+    fn notify_transaction(
+        &self,
+        transaction: ReplicaTransactionInfoVersions,
+        slot: Slot,
+    ) -> Result<()> {
         match transaction {
             ReplicaTransactionInfoVersions::V0_0_1(_info) => {
                 panic!("ReplicaTransactionInfoVersion::V0_0_1 unsupported, please upgrade your Solana node.");
@@ -168,7 +177,6 @@ impl GeyserPlugin for IndexerPlugin {
             ReplicaBlockInfoVersions::V0_0_2(_info) => {
                 let block_info = parse_block_metadata(_info.clone());
                 info!("parsed_block_info: {:?}", block_info);
-                info!("rewards: {:?}", block_info.rewards);
                 // ? Send block metadata to kafka and/or postgres
                 Ok(())
             }

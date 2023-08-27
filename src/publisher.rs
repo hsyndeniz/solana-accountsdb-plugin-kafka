@@ -14,8 +14,8 @@
 
 use {
     crate::{
-        common::serialize_struct,
         common::block::{BlockInfoV2, SlotInfo},
+        common::serialize_struct,
         message_wrapper::EventMessage::{self, Account, Transaction},
         prom::{
             StatsThreadedProducerContext, UPLOAD_ACCOUNTS_TOTAL, UPLOAD_SLOTS_TOTAL,

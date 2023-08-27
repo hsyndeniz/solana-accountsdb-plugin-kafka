@@ -1,8 +1,8 @@
 use {
     serde::{Deserialize, Serialize},
-    solana_program::clock::Slot,
     solana_geyser_plugin_interface::geyser_plugin_interface,
     solana_geyser_plugin_interface::geyser_plugin_interface::ReplicaBlockInfoV2,
+    solana_program::clock::Slot,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
