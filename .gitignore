@@ -1,6 +1,8 @@
 /target
 .idea/
 *.json
-!example-config.json
+config.json
 
 /test-ledger
+
+Cargo.lock

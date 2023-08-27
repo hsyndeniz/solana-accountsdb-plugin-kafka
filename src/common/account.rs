@@ -3,15 +3,16 @@ use {
     serde::{Deserialize, Serialize},
     solana_geyser_plugin_interface::geyser_plugin_interface::ReplicaAccountInfoV3,
     solana_program::clock::Slot,
+    solana_program::pubkey::Pubkey,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AccountInfoV3 {
     pub slot: Slot,
     pub is_startup: bool,
-    pub pubkey: Vec<u8>,
+    pub pubkey: String,
     pub lamports: u64,
-    pub owner: Vec<u8>,
+    pub owner: String,
     pub executable: bool,
     pub rent_epoch: u64,
     pub data: Vec<u8>,
@@ -24,9 +25,9 @@ impl AccountInfoV3 {
         Self {
             slot,
             is_startup,
-            pubkey: account_info.pubkey.to_vec(),
+            pubkey: Pubkey::try_from(account_info.pubkey.clone()).unwrap().to_string(),
             lamports: account_info.lamports,
-            owner: account_info.owner.to_vec(),
+            owner: Pubkey::try_from(account_info.owner.clone()).unwrap().to_string(),
             executable: account_info.executable,
             rent_epoch: account_info.rent_epoch,
             data: account_info.data.to_vec(),

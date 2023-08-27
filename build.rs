@@ -1,29 +1,11 @@
 use cargo_lock::Lockfile;
 
 fn main() -> anyhow::Result<()> {
-    // Proto
-    let mut config = prost_build::Config::new();
-    config.boxed(".blockdaemon.solana.accountsdb_plugin_kafka.types.MessageWrapper");
-    config.protoc_arg("--experimental_allow_proto3_optional");
-    config.compile_protos(&["proto/event.proto"], &["proto/"])?;
-
-    // Version metrics
-    let mut envs = vergen::EmitBuilder::builder();
-    envs.all_build().all_rustc();
-    envs.emit()?;
-
-    // vergen git version does not looks cool
-    println!(
-        "cargo:rustc-env=GIT_VERSION={}",
-        git_version::git_version!()
-    );
-
-    // Extract Solana version
     let lockfile = Lockfile::load("./Cargo.lock")?;
-    println!(
-        "cargo:rustc-env=SOLANA_SDK_VERSION={}",
-        get_pkg_version(&lockfile, "solana-sdk")
-    );
+
+    println!("cargo:rustc-env=GIT_VERSION={}", git_version::git_version!());
+
+    println!("cargo:rustc-env=SOLANA_SDK_VERSION={}", get_pkg_version(&lockfile, "solana-sdk"));
 
     Ok(())
 }

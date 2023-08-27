@@ -1,17 +1,21 @@
-use crate::prom::StatsThreadedProducerContext;
-use log::info;
-
-use rdkafka::{
-    config::FromClientConfigAndContext, error::KafkaResult, producer::ThreadedProducer,
-    ClientConfig,
+use {
+    log::info,
+    rdkafka::{
+        producer::DefaultProducerContext,
+        config::FromClientConfig,
+        error::KafkaResult,
+        producer::ThreadedProducer,
+        ClientConfig,
+    },
+    serde::{Deserialize, Serialize},
+    solana_geyser_plugin_interface::geyser_plugin_interface::{GeyserPluginError, Result},
+    solana_sdk::commitment_config::CommitmentLevel,
+    std::{
+        collections::HashMap,
+        fs::File,
+        path::Path,
+    },
 };
-use serde::{Deserialize, Serialize};
-use solana_geyser_plugin_interface::geyser_plugin_interface::{GeyserPluginError, Result};
-use solana_sdk::commitment_config::CommitmentLevel;
-use std::collections::HashMap;
-use std::fs::File;
-use std::net::SocketAddr;
-use std::path::Path;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct KafkaConfig {
@@ -24,10 +28,9 @@ pub struct KafkaConfig {
     pub entry_notification_topic: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub kafka_config: KafkaConfig,
-    pub prometheus: Option<SocketAddr>,
     pub account_data_notifications_enabled: bool,
     pub transaction_notifications_enabled: bool,
     pub slot_notifications_enabled: bool,
@@ -72,18 +75,46 @@ impl Config {
         info!("Parsing config file: {:?}", file);
         let config: Config = serde_json::from_reader(&mut file).map_err(|err| {
             info!("Error reading config file: {}", err);
-            GeyserPluginError::ConfigFileReadError {
-                msg: err.to_string(),
-            }
+            GeyserPluginError::ConfigFileReadError { msg: err.to_string() }
         })?;
         Ok(config)
     }
 
-    pub fn producer(&self) -> KafkaResult<ThreadedProducer<StatsThreadedProducerContext>> {
+    pub fn producer(&self) -> KafkaResult<ThreadedProducer<DefaultProducerContext>> {
         let mut config = ClientConfig::new();
         for (k, v) in self.kafka_config.kafka.iter() {
             config.set(k, v);
         }
-        ThreadedProducer::from_config_and_context(&config, StatsThreadedProducerContext::default())
+        ThreadedProducer::from_config(&config)
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            kafka_config: KafkaConfig {
+                kafka: HashMap::new(),
+                shutdown_timeout_ms: 30000,
+                update_account_topic: "update_account".to_string(),
+                transaction_topic: "transaction".to_string(),
+                slot_status_topic: "slot_status".to_string(),
+                block_metadata_topic: "block_metadata".to_string(),
+                entry_notification_topic: "entry_notification".to_string(),
+            },
+            account_data_notifications_enabled: true,
+            transaction_notifications_enabled: true,
+            slot_notifications_enabled: true,
+            block_notifications_enabled: true,
+            entry_notifications_enabled: true,
+            commitment_level: CommitmentLevel::Processed,
+            filters: Filters {
+                accounts: AccountsFilter {
+                    include: vec![],
+                    exclude: None,
+                },
+                transactions: None,
+                programs: None,
+            },
+        }
     }
 }

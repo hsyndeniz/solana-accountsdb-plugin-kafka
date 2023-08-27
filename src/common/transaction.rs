@@ -8,8 +8,7 @@ use {
         message::{legacy, v0, AccountKeys},
     },
     solana_sdk::{
-        signature::Signature, transaction::Result as TransactionResult,
-        transaction::TransactionError, transaction_context::TransactionReturnData,
+        signature::Signature, transaction::Result as TransactionResult, transaction::TransactionError, transaction_context::TransactionReturnData,
     },
     solana_transaction_status::{InnerInstructions, Rewards},
     std::borrow::Cow,
@@ -41,22 +40,14 @@ impl TransactionInfoV2 {
                 fee: transaction.transaction_status_meta.fee,
                 pre_balances: transaction.transaction_status_meta.pre_balances.to_vec(),
                 post_balances: transaction.transaction_status_meta.post_balances.to_vec(),
-                inner_instructions: transaction
-                    .transaction_status_meta
-                    .inner_instructions
-                    .to_owned(),
+                inner_instructions: transaction.transaction_status_meta.inner_instructions.to_owned(),
                 log_messages: transaction.transaction_status_meta.log_messages.to_owned(),
                 pre_token_balances: Some(
                     transaction
                         .transaction_status_meta
                         .pre_token_balances
                         .as_ref()
-                        .map(|balances| {
-                            balances
-                                .iter()
-                                .map(|balance| TransactionTokenBalance::from(balance))
-                                .collect()
-                        })
+                        .map(|balances| balances.iter().map(|balance| TransactionTokenBalance::from(balance)).collect())
                         .unwrap_or_default(),
                 ),
                 post_token_balances: Some(
@@ -64,19 +55,11 @@ impl TransactionInfoV2 {
                         .transaction_status_meta
                         .post_token_balances
                         .as_ref()
-                        .map(|balances| {
-                            balances
-                                .iter()
-                                .map(|balance| TransactionTokenBalance::from(balance))
-                                .collect()
-                        })
+                        .map(|balances| balances.iter().map(|balance| TransactionTokenBalance::from(balance)).collect())
                         .unwrap_or_default(),
                 ),
                 rewards: transaction.transaction_status_meta.rewards.to_owned(),
-                loaded_addresses: transaction
-                    .transaction_status_meta
-                    .loaded_addresses
-                    .to_owned(),
+                loaded_addresses: transaction.transaction_status_meta.loaded_addresses.to_owned(),
                 return_data: transaction.transaction_status_meta.return_data.to_owned(),
                 compute_units_consumed: transaction.transaction_status_meta.compute_units_consumed,
             },
@@ -97,19 +80,15 @@ impl From<&solana_sdk::transaction::SanitizedTransaction> for SanitizedTransacti
     fn from(transaction: &solana_sdk::transaction::SanitizedTransaction) -> Self {
         Self {
             message: match transaction.message() {
-                solana_sdk::message::SanitizedMessage::Legacy(message) => {
-                    SanitizedMessage::Legacy(LegacyMessage {
-                        message: message.message.to_owned(),
-                        is_writable_account_cache: message.is_writable_account_cache.to_vec(),
-                    })
-                }
-                solana_sdk::message::SanitizedMessage::V0(message) => {
-                    SanitizedMessage::V0(LoadedMessage {
-                        message: message.message.to_owned(),
-                        loaded_addresses: message.loaded_addresses.to_owned(),
-                        is_writable_account_cache: message.is_writable_account_cache.to_vec(),
-                    })
-                }
+                solana_sdk::message::SanitizedMessage::Legacy(message) => SanitizedMessage::Legacy(LegacyMessage {
+                    message: message.message.to_owned(),
+                    is_writable_account_cache: message.is_writable_account_cache.to_vec(),
+                }),
+                solana_sdk::message::SanitizedMessage::V0(message) => SanitizedMessage::V0(LoadedMessage {
+                    message: message.message.to_owned(),
+                    loaded_addresses: message.loaded_addresses.to_owned(),
+                    is_writable_account_cache: message.is_writable_account_cache.to_vec(),
+                }),
             },
             message_hash: *transaction.message_hash(),
             is_simple_vote_tx: transaction.is_simple_vote_transaction(),
@@ -229,20 +208,14 @@ impl Eq for UiTokenAmount {}
 
 impl UiTokenAmount {
     pub fn real_number_string(&self) -> String {
-        real_number_string(
-            u64::from_str(&self.amount).unwrap_or_default(),
-            self.decimals,
-        )
+        real_number_string(u64::from_str(&self.amount).unwrap_or_default(), self.decimals)
     }
 
     pub fn real_number_string_trimmed(&self) -> String {
         if !self.ui_amount_string.is_empty() {
             self.ui_amount_string.clone()
         } else {
-            real_number_string_trimmed(
-                u64::from_str(&self.amount).unwrap_or_default(),
-                self.decimals,
-            )
+            real_number_string_trimmed(u64::from_str(&self.amount).unwrap_or_default(), self.decimals)
         }
     }
 }

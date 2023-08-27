@@ -1,5 +1,5 @@
 {
-  "libpath": "/Users/huseyin/Desktop/indexer/finally/target/debug/libsolana_indexer.dylib",
+  "libpath": "./target/debug/libsolana_indexer.dylib",
   "account_data_notifications_enabled": true,
   "transaction_notifications_enabled": true,
   "slot_notifications_enabled": true,
@@ -14,13 +14,13 @@
     "entry_notification_topic": "solana.testnet.entry_notification",
     "kafka": {
       "bootstrap.servers": "localhost:9092",
+      "message.timeout.ms": "300000",
+      "request.timeout.ms": "5000",
       "request.required.acks": "1",
-      "message.timeout.ms": "30000",
-      "compression.type": "none",
-      "partitioner": "murmur2_random"
+      "compression.codec": "none"
     }
   },
-  "prometheus_config": "localhost:8086",
+  "prometheus_config": "localhost:9090",
   "commitment_level": "finalized",
   "filters": {
     "accounts": {
@@ -32,10 +32,7 @@
     },
     "programs": {
       "include": ["*"],
-      "exclude": [
-        "Sysvar1111111111111111111111111111111111111",
-        "Vote111111111111111111111111111111111111111"
-      ]
+      "exclude": []
     },
     "transactions": {
       "mentions": ["*"]
