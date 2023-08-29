@@ -3,9 +3,15 @@ use cargo_lock::Lockfile;
 fn main() -> anyhow::Result<()> {
     let lockfile = Lockfile::load("./Cargo.lock")?;
 
-    println!("cargo:rustc-env=GIT_VERSION={}", git_version::git_version!());
+    println!(
+        "cargo:rustc-env=GIT_VERSION={}",
+        git_version::git_version!()
+    );
 
-    println!("cargo:rustc-env=SOLANA_SDK_VERSION={}", get_pkg_version(&lockfile, "solana-sdk"));
+    println!(
+        "cargo:rustc-env=SOLANA_SDK_VERSION={}",
+        get_pkg_version(&lockfile, "solana-sdk")
+    );
 
     Ok(())
 }

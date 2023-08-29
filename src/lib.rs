@@ -1,15 +1,11 @@
 use solana_geyser_plugin_interface::geyser_plugin_interface::GeyserPlugin;
 
-mod config;
 mod common;
+mod config;
 mod kafka;
 mod plugin;
 
-pub use {
-    config::Config,
-    kafka::KafkaService,
-    plugin::IndexerPlugin,
-};
+pub use {config::Config, kafka::KafkaService, plugin::IndexerPlugin};
 
 #[no_mangle]
 #[allow(improper_ctypes_definitions)]

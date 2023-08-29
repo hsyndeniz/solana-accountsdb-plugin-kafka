@@ -11,8 +11,8 @@ pub enum SlotStatus {
     Processed,
     #[serde(rename = "confirmed")]
     Confirmed,
-    #[serde(rename = "rooted")]
-    Rooted,
+    #[serde(rename = "finalized")]
+    Finalized,
 }
 
 impl SlotStatus {
@@ -20,7 +20,7 @@ impl SlotStatus {
         match self {
             SlotStatus::Processed => "processed",
             SlotStatus::Confirmed => "confirmed",
-            SlotStatus::Rooted => "rooted",
+            SlotStatus::Finalized => "finalized",
         }
     }
 }
@@ -53,14 +53,18 @@ pub struct EntryInfo<'a> {
     pub executed_transaction_count: u64,
 }
 
-pub fn parse_slot_status(slot: Slot, parent: Option<u64>, status: geyser_plugin_interface::SlotStatus) -> SlotInfo {
+pub fn parse_slot_status(
+    slot: Slot,
+    parent: Option<u64>,
+    status: geyser_plugin_interface::SlotStatus,
+) -> SlotInfo {
     SlotInfo {
         slot,
         parent: parent.unwrap_or(0),
         status: match status {
             geyser_plugin_interface::SlotStatus::Processed => SlotStatus::Confirmed,
             geyser_plugin_interface::SlotStatus::Confirmed => SlotStatus::Processed,
-            geyser_plugin_interface::SlotStatus::Rooted => SlotStatus::Rooted,
+            geyser_plugin_interface::SlotStatus::Rooted => SlotStatus::Finalized,
         },
     }
 }

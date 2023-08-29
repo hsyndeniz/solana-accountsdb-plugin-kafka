@@ -1,20 +1,13 @@
 use {
     log::info,
     rdkafka::{
-        producer::DefaultProducerContext,
-        config::FromClientConfig,
-        error::KafkaResult,
-        producer::ThreadedProducer,
-        ClientConfig,
+        config::FromClientConfig, error::KafkaResult, producer::DefaultProducerContext,
+        producer::ThreadedProducer, ClientConfig,
     },
     serde::{Deserialize, Serialize},
     solana_geyser_plugin_interface::geyser_plugin_interface::{GeyserPluginError, Result},
     solana_sdk::commitment_config::CommitmentLevel,
-    std::{
-        collections::HashMap,
-        fs::File,
-        path::Path,
-    },
+    std::{collections::HashMap, fs::File, path::Path},
 };
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -75,7 +68,9 @@ impl Config {
         info!("Parsing config file: {:?}", file);
         let config: Config = serde_json::from_reader(&mut file).map_err(|err| {
             info!("Error reading config file: {}", err);
-            GeyserPluginError::ConfigFileReadError { msg: err.to_string() }
+            GeyserPluginError::ConfigFileReadError {
+                msg: err.to_string(),
+            }
         })?;
         Ok(config)
     }

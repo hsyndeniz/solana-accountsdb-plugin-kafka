@@ -25,9 +25,13 @@ impl AccountInfoV3 {
         Self {
             slot,
             is_startup,
-            pubkey: Pubkey::try_from(account_info.pubkey.clone()).unwrap().to_string(),
+            pubkey: Pubkey::try_from(account_info.pubkey.clone())
+                .unwrap()
+                .to_string(),
             lamports: account_info.lamports,
-            owner: Pubkey::try_from(account_info.owner.clone()).unwrap().to_string(),
+            owner: Pubkey::try_from(account_info.owner.clone())
+                .unwrap()
+                .to_string(),
             executable: account_info.executable,
             rent_epoch: account_info.rent_epoch,
             data: account_info.data.to_vec(),

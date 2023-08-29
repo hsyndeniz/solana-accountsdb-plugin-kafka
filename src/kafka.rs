@@ -1,9 +1,9 @@
 use {
     crate::{
         common::{
-            serialize_struct,
             account::AccountInfoV3,
             block::{BlockInfoV2, EntryInfo, SlotInfo},
+            serialize_struct,
             transaction::TransactionInfoV2,
         },
         Config,
@@ -50,29 +50,54 @@ impl KafkaService {
             }
             Err(e) => {
                 info!("serialize_struct error: {:?}", e);
-                Err(KafkaError::MessageProduction(RDKafkaErrorCode::InvalidMessage))
+                Err(KafkaError::MessageProduction(
+                    RDKafkaErrorCode::InvalidMessage,
+                ))
             }
         }
     }
 
     pub fn update_account(&self, account_info: AccountInfoV3) -> Result<(), KafkaError> {
-        self.send_to_topic(&self.update_account_topic, account_info.pubkey.clone(), account_info)
+        self.send_to_topic(
+            &self.update_account_topic,
+            account_info.pubkey.clone(),
+            account_info,
+        )
     }
 
-    pub fn update_transaction(&self, transaction_info: TransactionInfoV2) -> Result<(), KafkaError> {
-        self.send_to_topic(&self.transaction_topic, transaction_info.signature.to_string(), transaction_info)
+    pub fn update_transaction(
+        &self,
+        transaction_info: TransactionInfoV2,
+    ) -> Result<(), KafkaError> {
+        self.send_to_topic(
+            &self.transaction_topic,
+            transaction_info.signature.to_string(),
+            transaction_info,
+        )
     }
 
     pub fn update_slot_status(&self, slot_info: SlotInfo) -> Result<(), KafkaError> {
-        self.send_to_topic(&self.slot_status_topic, slot_info.slot.to_string(), slot_info)
+        self.send_to_topic(
+            &self.slot_status_topic,
+            slot_info.slot.to_string(),
+            slot_info,
+        )
     }
 
     pub fn update_block_metadata(&self, block_info: BlockInfoV2) -> Result<(), KafkaError> {
-        self.send_to_topic(&self.block_metadata_topic, block_info.blockhash.to_string(), block_info)
+        self.send_to_topic(
+            &self.block_metadata_topic,
+            block_info.blockhash.to_string(),
+            block_info,
+        )
     }
 
     pub fn update_entry_notification(&self, entry_info: EntryInfo) -> Result<(), KafkaError> {
-        self.send_to_topic(&self.entry_notification_topic, entry_info.slot.to_string(), entry_info)
+        self.send_to_topic(
+            &self.entry_notification_topic,
+            entry_info.slot.to_string(),
+            entry_info,
+        )
     }
 }
 
