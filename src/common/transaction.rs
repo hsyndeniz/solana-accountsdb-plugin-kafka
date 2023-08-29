@@ -1,14 +1,16 @@
+use solana_transaction_status::parse_accounts::{parse_legacy_message_accounts, parse_v0_message_accounts};
+use solana_transaction_status::{UiInstruction, UiParsedInstruction, UiPartiallyDecodedInstruction};
+use solana_transaction_status::parse_instruction::parse;
 use {
     serde::{Deserialize, Serialize},
     solana_account_decoder::parse_token::{real_number_string, real_number_string_trimmed},
     solana_geyser_plugin_interface::geyser_plugin_interface::ReplicaTransactionInfoV2,
     solana_program::{
         clock::Slot,
-        hash::Hash,
         message::{legacy, v0, AccountKeys},
     },
     solana_sdk::{
-        signature::Signature, transaction::Result as TransactionResult,
+        transaction::Result as TransactionResult,
         transaction::TransactionError, transaction_context::TransactionReturnData,
     },
     solana_transaction_status::{InnerInstructions, Rewards},
@@ -19,7 +21,7 @@ use {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionInfoV2 {
     pub slot: Slot,
-    pub signature: Signature,
+    pub signature: String,
     pub is_vote: bool,
     pub transaction: SanitizedTransaction,
     pub transaction_status_meta: TransactionStatusMeta,
@@ -30,7 +32,7 @@ impl TransactionInfoV2 {
     pub fn from(transaction: &ReplicaTransactionInfoV2, slot: Slot) -> Self {
         Self {
             slot,
-            signature: Signature::from_str(&transaction.signature.to_string()).unwrap(),
+            signature: transaction.signature.to_owned().to_string(),
             is_vote: transaction.is_vote,
             transaction: SanitizedTransaction::from(transaction.transaction),
             transaction_status_meta: TransactionStatusMeta {
@@ -88,17 +90,86 @@ impl TransactionInfoV2 {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SanitizedTransaction {
     pub message: SanitizedMessage,
-    pub message_hash: Hash,
+    pub message_hash: String,
     pub is_simple_vote_tx: bool,
-    pub signatures: Vec<Signature>,
+    pub signatures: Vec<String>,
+    pub versioned_message: Option<solana_sdk::message::VersionedMessage>,
+    parsed_message: Option<solana_transaction_status::UiParsedMessage>,
 }
 
 impl From<&solana_sdk::transaction::SanitizedTransaction> for SanitizedTransaction {
+    //noinspection DuplicatedCode
     fn from(transaction: &solana_sdk::transaction::SanitizedTransaction) -> Self {
         Self {
+            parsed_message: match transaction.message() {
+                solana_sdk::message::SanitizedMessage::Legacy(message) => {
+                    let account_keys = AccountKeys::new(&message.message.account_keys, None);
+                    Some(solana_transaction_status::UiParsedMessage {
+                        account_keys: parse_legacy_message_accounts(&message.message),
+                        recent_blockhash: message.message.recent_blockhash.to_string(),
+                        instructions: message.message.instructions.iter().map(|i| {
+                            let program_id = &account_keys[i.program_id_index as usize];
+                            let account_keys = AccountKeys::new(&message.message.account_keys, None);
+                            if let Ok(parsed_instruction) = parse(program_id, i, &account_keys, None) {
+                                UiInstruction::Parsed(UiParsedInstruction::Parsed(parsed_instruction))
+                            } else {
+                                UiInstruction::Parsed(UiParsedInstruction::PartiallyDecoded(
+                                    UiPartiallyDecodedInstruction {
+                                        program_id: account_keys[i.program_id_index as usize].to_string(),
+                                        accounts: i
+                                          .accounts
+                                          .iter()
+                                          .map(|&i| account_keys[i as usize].to_string())
+                                          .collect(),
+                                        data: bs58::encode(i.data.clone()).into_string(),
+                                        stack_height: None,
+                                    },
+                                ))
+                            }
+                        }).collect(),
+                        address_table_lookups: None,
+                    })
+                }
+                solana_sdk::message::SanitizedMessage::V0(message) => {
+                    let account_keys = AccountKeys::new(&message.message.account_keys, None);
+                    Some(solana_transaction_status::UiParsedMessage {
+                        account_keys: parse_v0_message_accounts(&message),
+                        recent_blockhash: message.message.recent_blockhash.to_string(),
+                        instructions: message.message.instructions.iter().map(|i| {
+                            let program_id = &account_keys[i.program_id_index as usize];
+                            let account_keys = AccountKeys::new(&message.message.account_keys, None);
+                            if let Ok(parsed_instruction) = parse(program_id, i, &account_keys, None) {
+                                UiInstruction::Parsed(UiParsedInstruction::Parsed(parsed_instruction))
+                            } else {
+                                UiInstruction::Parsed(UiParsedInstruction::PartiallyDecoded(
+                                    UiPartiallyDecodedInstruction {
+                                        program_id: account_keys[i.program_id_index as usize].to_string(),
+                                        accounts: i
+                                          .accounts
+                                          .iter()
+                                          .map(|&i| account_keys[i as usize].to_string())
+                                          .collect(),
+                                        data: bs58::encode(i.data.clone()).into_string(),
+                                        stack_height: None,
+                                    },
+                                ))
+                            }
+                        }).collect(),
+                        address_table_lookups: Some(message.message.address_table_lookups.iter().map(core::convert::Into::into).collect())
+                    })
+                }
+            },
+            versioned_message: match transaction.message() {
+                solana_sdk::message::SanitizedMessage::Legacy(message) => {
+                    Some(solana_sdk::message::VersionedMessage::Legacy(message.message.clone().into_owned()))
+                }
+                solana_sdk::message::SanitizedMessage::V0(message) => {
+                    Some(solana_sdk::message::VersionedMessage::V0(message.message.clone().into_owned()))
+                }
+            },
             message: match transaction.message() {
                 solana_sdk::message::SanitizedMessage::Legacy(message) => {
-                    SanitizedMessage::Legacy(LegacyMessage {
+                        SanitizedMessage::Legacy(LegacyMessage {
                         message: message.message.to_owned(),
                         is_writable_account_cache: message.is_writable_account_cache.to_vec(),
                     })
@@ -111,9 +182,9 @@ impl From<&solana_sdk::transaction::SanitizedTransaction> for SanitizedTransacti
                     })
                 }
             },
-            message_hash: *transaction.message_hash(),
+            message_hash: format!("{}", transaction.message_hash()),
             is_simple_vote_tx: transaction.is_simple_vote_transaction(),
-            signatures: transaction.signatures().to_vec(),
+            signatures: transaction.signatures().iter().map(|s| s.to_string()).collect(),
         }
     }
 }

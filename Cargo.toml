@@ -60,10 +60,10 @@ libloading = "0.8.0"
 serial_test = "2.0.0"
 socket2 = { version = "0.5.3", features = ["all"] }
 
-# solana-local-cluster = { version = "1.16.8" }
-# solana-net-utils = { version = "1.16.8" }
-# solana-streamer = { version = "1.16.8" }
-# solana-core = { version = "1.16.8" }
+# solana-local-cluster = { version = "1.16.10" }
+# solana-net-utils = { version = "1.16.10" }
+# solana-streamer = { version = "1.16.10" }
+# solana-core = { version = "1.16.10" }
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
