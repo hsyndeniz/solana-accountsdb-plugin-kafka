@@ -1,5 +1,5 @@
-use rdkafka::error::{KafkaError, RDKafkaErrorCode};
 use serde::Serialize;
+use rdkafka::error::{KafkaError, RDKafkaErrorCode};
 
 pub mod account;
 pub mod block;

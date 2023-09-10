@@ -11,15 +11,15 @@ license = "Apache-2.0"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-solana-sdk = { version = "1.16.10" }
-solana-logger = { version = "1.16.10" }
-solana-measure = { version = "1.16.10" }
-solana-metrics = { version = "1.16.10" }
-solana-runtime = { version = "1.16.10" }
-solana-program = { version = "1.16.10" }
-solana-account-decoder = { version = "1.16.10" }
-solana-transaction-status = { version = "1.16.10" }
-solana-geyser-plugin-interface = { version = "1.16.10" }
+solana-sdk = { version = "1.16.12" }
+solana-logger = { version = "1.16.12" }
+solana-measure = { version = "1.16.12" }
+solana-metrics = { version = "1.16.12" }
+solana-runtime = { version = "1.16.12" }
+solana-program = { version = "1.16.12" }
+solana-account-decoder = { version = "1.16.12" }
+solana-transaction-status = { version = "1.16.12" }
+solana-geyser-plugin-interface = { version = "1.16.12" }
 
 log = "*"
 prost = "*"
@@ -32,7 +32,7 @@ rdkafka = { version = "0.33.2", features = ["ssl", "sasl"] }
 tokio = { version = "1.32.0", features = ["rt-multi-thread", "time", "macros", "sync"] }
 
 openssl = { version = "0.10.57" }
-thiserror = { version = "1.0.47" }
+thiserror = { version = "1.0.48" }
 tokio-postgres = { version = "0.7.10" }
 postgres-openssl = { version = "0.5.0" }
 postgres-types = { version = "0.2.6", features = ["derive"] }
@@ -41,7 +41,7 @@ postgres = { version = "0.19.7", features = ["with-chrono-0_4", "with-serde_json
 bs58 = { version = "0.5.0" }
 bytemuck = { version = "1.13.1" }
 crossbeam-channel = { version = "0.5.8" }
-chrono = { version = "0.4.26", features = ["serde"] }
+chrono = { version = "0.4.28", features = ["serde"] }
 
 avro-rs = { version = "0.13.0" }
 apache-avro = { version = "0.15.0", features = ["snappy"] }

@@ -6,13 +6,14 @@ use {
         config::Config,
         KafkaService,
     },
-    log::{error, info},
     solana_geyser_plugin_interface::geyser_plugin_interface::{
         GeyserPlugin, GeyserPluginError, ReplicaAccountInfoVersions, ReplicaBlockInfoVersions,
         ReplicaEntryInfoVersions, ReplicaTransactionInfoVersions, Result, SlotStatus,
     },
     solana_program::clock::Slot,
+    solana_program::pubkey::Pubkey,
     solana_sdk::commitment_config::CommitmentLevel,
+    log::{error, info},
     std::fmt::Debug,
 };
 
@@ -99,6 +100,24 @@ impl GeyserPlugin for IndexerPlugin {
                     // * ignoring account update: account data notifications disabled
                     return Ok(());
                 }
+                let pubkey = Pubkey::try_from(_info.pubkey.clone()).unwrap().to_string();
+                // if pubkey starts with Sysvar, ignore
+                if pubkey.starts_with("Sysvar") {
+                    info!("ignoring account update: system account");
+                    return Ok(());
+                }
+
+                match _info.txn.to_owned() {
+                    Some(txn) => {
+                        if txn.is_simple_vote_transaction() {
+                            info!("ignoring account update: vote transaction");
+                            return Ok(());
+                        }
+                        Some(txn)
+                    }
+                    None => None,
+                };
+
                 let account_info = AccountInfoV3::from(_info, slot, is_startup);
                 info!("account_info: slot: {:?}, pubkey: {:?}, is_startup: {:?}, lamports: {:?}, owner: {:?}, executable: {:?}, rent_epoch: {:?}, write_version: {:?}, txn: {:?}", account_info.slot, account_info.pubkey, account_info.is_startup, account_info.lamports, account_info.owner, account_info.executable, account_info.rent_epoch, account_info.write_version, account_info.txn);
                 self.kafka().update_account(account_info).map_err(|error| {
@@ -158,6 +177,9 @@ impl GeyserPlugin for IndexerPlugin {
                 // ? Ignore vote transactions
                 let transaction_info = TransactionInfoV2::from(_info, slot);
                 info!("transaction_info: {:?}", transaction_info);
+                if transaction_info.is_vote {
+                    return Ok(());
+                }
                 self.kafka()
                     .update_transaction(transaction_info)
                     .map_err(|error| GeyserPluginError::TransactionUpdateError {
@@ -176,11 +198,12 @@ impl GeyserPlugin for IndexerPlugin {
                 } else {
                     let entry_info = parse_entry_info(_info.clone());
                     info!("entry_info: {:?}", entry_info);
-                    self.kafka()
-                        .update_entry_notification(entry_info)
-                        .map_err(|error| GeyserPluginError::SlotStatusUpdateError {
-                            msg: error.to_string(),
-                        })
+                    Ok(())
+                    // self.kafka()
+                    //     .update_entry_notification(entry_info)
+                    //     .map_err(|error| GeyserPluginError::SlotStatusUpdateError {
+                    //         msg: error.to_string(),
+                    //     })
                 }
             }
         }
